@@ -52,7 +52,7 @@ var light = 'wb-mr6c_1/K5';         // Создаем переменную с у
 button.createLightingGroup('Свет на кухне' , 'Light_kitchen' , but , light );    
 ```
 <h1 align="center">
-  <img src="/buttonLight/img/1-1.png">
+  <img src="/img/1-1.png">
   <br>
 </h1>
 
@@ -81,7 +81,7 @@ var light = [
 button.createLightingGroup('Свет в коридоре' , 'Light_hallway' , but , light );    
 ```
 <h1 align="center">
-  <img src="/buttonLight/img/2-1.png">
+  <img src="/img/2-1.png">
   <br>
 </h1>
 
@@ -114,7 +114,7 @@ var motion = 'wb-msw-v4_80/Current Motion';
 button.createLightingGroup('Свет в коридоре' , 'Light_hallway' , but , light , false , motion );    
 ```
 <h1 align="center">
-  <img src="/buttonLight/img/3-1.png">
+  <img src="/img/3-1.png">
   <br>
 </h1>
 
