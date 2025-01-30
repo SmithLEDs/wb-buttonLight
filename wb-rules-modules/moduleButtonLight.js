@@ -1,6 +1,7 @@
 
 /**
  * @brief   Данная функция создает виртуальное устройство для управления группой света.
+ *          v.1.0
  * 
  * @param {String}  title     Описание виртуального устройства (Можно на русском)
  * @param {String}  name      Имя виртуального устройства (Будет отображаться в новом виртуальном кстройстве как name/... )
@@ -277,7 +278,7 @@ function createLightingGroup ( title , name , Button , Light , master , Motion )
         // Правило отслеживает изменение датчиков движения
         defineRule(name + '_motionChange', {
             whenChanged: targetMotion,
-            then: function (newValue, devName, cellName) {
+            then: function () {
                 var move = false;
 
                 
