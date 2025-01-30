@@ -422,7 +422,7 @@ function reloadDeviceArray( source , target , targetError ) {
             }
         });
     } else {
-        if ( deviceExists(item) ) {
+        if ( deviceExists(source) ) {
             targetError.push( source + "#error" );
             target.push( source );   
         }     
