@@ -30,8 +30,7 @@ function createLightingGroup ( title , name , Button , Light , master , Motion )
 
     createVirtualDevice( title , name );
 
-    // Первым делом перебираем массивы всех физических устройств и удаляем из массива
-    // несуществующие устройства
+    // Первым делом перебираем массивы всех физических устройств
     reloadDeviceArray( Button , targetButton , buttonError);
     reloadDeviceArray( Light  , targetLight  , lightError);
     
@@ -43,6 +42,7 @@ function createLightingGroup ( title , name , Button , Light , master , Motion )
         var targetMotion = [];  // Массив для хранения устройств движения
         var motionError = [];   // Массив для хранения устройств движения с meta #error 
         reloadDeviceArray( Motion , targetMotion , motionError);
+        
         createErrorRule( motionError , name , 'motion_' ); // Отслеживаем изменение meta #error устройств движения
     }
 
@@ -422,10 +422,10 @@ function reloadDeviceArray( source , target , targetError ) {
             }
         });
     } else {
-        if ( deviceExists(source) ) {
+        if ( deviceExists(item) ) {
             targetError.push( source + "#error" );
-            target.push( source );
-        }        
+            target.push( source );   
+        }     
     }
 }
 
@@ -454,6 +454,12 @@ function deviceExists( topic ) {
     return exists;
 }
 
+
 exports.createLightingGroup  = function( title , name , Button , Light , master , Motion ) {
-    createLightingGroup ( title , name , Button , Light , master , Motion );
+    // Задержка в данном случае оправдана. После перезагрузки контроллера, функция "getDevice"
+    // выдавала, что устройства не существует, хотя по факту он имелся. Задержка даже в 3 секунды 
+    // решала данную проблему.
+    setTimeout( function() {
+        createLightingGroup ( title , name , Button , Light , master , Motion );
+    }, 5000 );
 } 
