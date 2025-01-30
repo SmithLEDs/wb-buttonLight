@@ -1,3 +1,6 @@
+[![latest](https://img.shields.io/github/v/release/SmithLEDs/wb-buttonLight.svg?color=brightgreen)](https://github.com/SmithLEDs/wb-buttonLight/releases/latest)
+[![Foo](https://img.shields.io/badge/Telegram-2CA5E0?style=social&logo=telegram&color=blue)](https://t.me/SmithLEDs)
+
 <h1 align="left">
   <br>
   <img height="150" src="logo_moduleButtonLight.png">
