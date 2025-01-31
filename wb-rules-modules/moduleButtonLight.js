@@ -28,14 +28,14 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
         error: [],
         virt: [],
         value: [],
-        name: 'buttonDevices'
+        name: name + ' (buttonDevices)'
     };
     var light = {
         target: [],  
         error: [],
         virt: [],
         value: [],
-        name: 'lightDevices'
+        name: name + ' (lightDevices)'
     };
 
     createVirtualDevice( title , name );
@@ -55,7 +55,7 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
             error: [],
             virt: [],
             value: [],
-            name: 'motionDevices'
+            name: name + ' (motionDevices)'
         };
 
         reloadDeviceArray( targetMotion , motion , name + '/motion_' );
@@ -404,7 +404,7 @@ function createVirtualDevice( title , name ) {
  * @param {*} target Структура на список устройств
  */
 function createErrorRule( target ) {
-    defineRule('ruleError - ' +  target.name, {
+    defineRule(target.name + ' ruleError', {
         whenChanged:  target.error,
         then: function (newValue, devName, cellName) {
             var i = target.error.indexOf( devName + '/' + cellName );
