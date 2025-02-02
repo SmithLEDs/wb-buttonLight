@@ -5,7 +5,7 @@
  * @version v.1.2
  * 
  * @param {String}  title           Описание виртуального устройства (Можно на русском)
- * @param {String}  name            Имя виртуального устройства (Будет отображаться в новом виртуальном кстройстве как name/... )
+ * @param {String}  name            Имя виртуального устройства (Будет отображаться в новом виртуальном устройстве как name/... )
  * @param {String}  targetButton    Одиночный топик или массив топиков, по изменению которых 
  *                                  будет происходить переключение света (Кнопки)
  * @param {String}  targetLight     Одиночный топик или массив топиков, которыми будет происходить управление (Реле)
@@ -17,26 +17,23 @@
  */
 function createLightingGroup ( title , name , targetButton , targetLight , master , targetMotion ) {
 
+    // Создаем объект прототип, из которого создадим новые объекты для источников
+    var baseTargetObject = {
+        target: [],     // Топик реального устройства
+        error: [],      // Топик реального устройства для отслеживание error
+        virt: [],       // Топик виртуального устройства, который ссылается на реальное устройство
+        value: []       // Тут просто на всякий храним значение реального устройства
+    };
+
     var firstStartRule = true;      // Флаг первого запуска модуля или перезагрузки правил
 
     if ( master ) {
         var ps = new PersistentStorage( name + "_storage", { global: true }); // Постоянное хранилище для запоминания состояний реле
     }
 
-    var button = {
-        target: [],  
-        error: [],
-        virt: [],
-        value: [],
-        name: name + ' (buttonDevices)'
-    };
-    var light = {
-        target: [],  
-        error: [],
-        virt: [],
-        value: [],
-        name: name + ' (lightDevices)'
-    };
+    // Создаем объекты для хранения устройств реле и кнопок
+    var button = Object.create( baseTargetObject );
+    var light = Object.create( baseTargetObject );
 
     createVirtualDevice( title , name );
 
@@ -45,27 +42,21 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
     reloadDeviceArray( targetLight , light , name + '/light_' );
     
     // Отслеживаем изменение meta #error устройств кнопок и света
-    createErrorRule( button );
-    createErrorRule( light );
+    createErrorRule( button , name + '(buttonDevices)' );
+    createErrorRule( light , name + '(lightDevices)' );
 
     if ( targetMotion ) {
-        // Структура для хранения устройств движения
-        var motion = {
-            target: [],  
-            error: [],
-            virt: [],
-            value: [],
-            name: name + ' (motionDevices)'
-        };
+        // Объект для хранения устройств движения
+        var motion = Object.create( baseTargetObject );
 
         reloadDeviceArray( targetMotion , motion , name + '/motion_' );
-        createErrorRule( motion ); // Отслеживаем изменение meta #error устройств движения
+        createErrorRule( motion , name + '(motionDevices)' ); // Отслеживаем изменение meta #error устройств движения
     }
 
 
     // Создаем новое правило для отслеживания переключений виртуальных кнопок,
     // что бы управлять физическими реле прямо из виртуального устройства
-    defineRule(name + ' ruleLight', {
+    defineRule(name + '_ruleClickVirtualLight', {
         whenChanged: light.virt,
         then: function (newValue, devName, cellName) {
             var i = light.virt.indexOf( devName + '/' + cellName );
@@ -81,7 +72,7 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
      *          Сразу при добавлении считываем текущее состояние реле. forceDefault обязателен.
      *          Так при обновлении правил новые виртуальные контролы перезагружаются с правильными состояния физических реле.
      */
-    defineRule(name + '_rebootRule', {
+    defineRule(name + '_ruleReboot', {
         asSoonAs: function() {
             return firstStartRule;
         },
@@ -198,7 +189,7 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
      *          -   Если это мастер-выключатель, то перед отключением запоминает 
      *              состояние реле в энергонезависимую память.
      */
-    defineRule(name + '_clickButtonVirtual', {
+    defineRule(name + '_ruleClickButtonVirtual', {
         whenChanged: name + '/button',
         then: function () {   
             light.target.forEach( function (item) {
@@ -220,7 +211,7 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
     });
 
     // Отслеживаем нажатие физической кнопки
-    defineRule(name + '_clickButtonPhysical', {
+    defineRule(name + '_ruleClickButtonPhysical', {
         whenChanged: button.target,
         then: function (newValue, devName, cellName) {
             dev[name]['button'] = true;
@@ -236,7 +227,7 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
 
 
     // Отслеживаем изменение переключений физических реле и записываем в контролы для визуализации
-    defineRule(name + '_releChange', {
+    defineRule(name + '_ruleReleChange', {
         whenChanged:  light.target,
         then: function (newValue, devName, cellName) {
             var flagON = false;
@@ -301,7 +292,7 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
 
 
         // Правило отслеживает изменение датчиков движения
-        defineRule(name + '_motionChange', {
+        defineRule(name + '_ruleMotionChange', {
             whenChanged: motion.target,
             then: function (newValue, devName, cellName) {
 
@@ -326,7 +317,7 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
         });
 
         // Правило для отслеживания начала движения
-        defineRule(name + '_motionON', {
+        defineRule(name + '_ruleMotionON', {
             asSoonAs: function() {
                 return dev[name]['motion'];
             },
@@ -341,7 +332,7 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
         });
 
         // Правило для отслеживания прекращения движения
-        defineRule(name + '_motionOFF', {
+        defineRule(name + '_ruleMotionOFF', {
             asSoonAs: function() {
                 return !dev[name]['motion'];
             },
@@ -403,8 +394,8 @@ function createVirtualDevice( title , name ) {
  * 
  * @param {*} target Структура на список устройств
  */
-function createErrorRule( target ) {
-    defineRule(target.name + ' ruleError', {
+function createErrorRule( target , nameRule ) {
+    defineRule( nameRule + '_ruleError', {
         whenChanged:  target.error,
         then: function (newValue, devName, cellName) {
             var i = target.error.indexOf( devName + '/' + cellName );
