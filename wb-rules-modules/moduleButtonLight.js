@@ -49,13 +49,15 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
     createErrorRule( light );
 
     if ( targetMotion ) {
-        // Структура для хранения устройств движения
+        // Объект для хранения устройств движения
         var motion = {
             target: [],  
             error: [],
             virt: [],
             value: [],
-            name: name + ' (motionDevices)'
+            name: name + ' (motionDevices)',
+            timeout: 10,
+            sens: 35
         };
 
         reloadDeviceArray( targetMotion , motion , name + '/motion_' );
@@ -159,15 +161,15 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
                 getDevice(name).addControl( "timeout" , { 
                     title: "Таймаут отключения света, мин.", 
                     type: "range", 
-                    value: 10, 
+                    value: motion.timeout, 
                     readonly: false,
                     min: 1,
-                    max: 20
+                    max: 30
                 });
                 getDevice(name).addControl( "sensitivity" , { 
                     title: "Чувствительность датчика", 
-                    type: "range", 
-                    value: 35, 
+                    type: "range",
+                    value: motion.sens,
                     readonly: false,
                     min: 1,
                     max: 500
@@ -273,8 +275,6 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
     if ( motion.target ) {
 
         var idTimer = null;            // Таймер для отключения света
-        var idTimoutMotion = null;     // Таймер для задержки отключения контрола "motion"
-
 
         // Создаем функцию, которая создает таймер для отключения света по таймауту "timeout"
         function startTimer() {
@@ -285,20 +285,28 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
                 }
                 idTimer = null;
                 
-            }, dev[name]['timeout'] * 1000 * 60 ); //
+            }, motion.timeout * 1000 * 60 ); //
         }
 
-        // Создаем функцию задержки для отключения контрола "motion" ( 10 секунд )
-        function startTimeoutMotion() {
-            return setTimeout(function () {
-                dev[name]['motion'] = false;
-                idTimoutMotion = null;
-                log.debug('[' + title + ']: Движение прекратилось');
-            }, 10 * 1000); // 
-        }
+        // Правило отслеживает изменение чувствительности датчиков
+        defineRule(name + '_sensitivityChange', {
+            when: function () {
+                return dev[name]['sensitivity'];
+            },
+            then: function () {
+                motion.sens = dev[name]['sensitivity'];
+            }
+        });
 
-
-
+        // Правило отслеживает изменение таймаута отключения света
+        defineRule(name + '_timeoutChange', {
+            when: function () {
+                return dev[name]['timeout'];
+            },
+            then: function () {
+                motion.timeout = dev[name]['timeout'];
+            }
+        });
 
         // Правило отслеживает изменение датчиков движения
         defineRule(name + '_motionChange', {
@@ -312,16 +320,17 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
                     dev[motion.virt[i]] = newValue;
                 }
 
-                if ( newValue > dev[name]['sensitivity'] ) {
-                    dev[name]['motion'] = true;
-
-                    // Очищаем и взводим по новой таймер на задержку отключения контрола "motion"
-                    if ( idTimoutMotion ) clearTimeout( idTimoutMotion );
-                    idTimoutMotion = startTimeoutMotion();
-
-                    // Если таймер на отключение света взведен, то отключаем его при появлении движения
-                    if ( idTimer ) clearTimeout( idTimer );
-                }
+                var move = false;
+                // Перебираем массив значений, и если хоть одно значение больше чувствительности взводим флаг
+                motion.value.forEach( function (item) {
+                    if ( item > motion.sens ) {
+                        move = true;
+                        // Если таймер на отключение света взведен, то отключаем 
+                        if ( idTimer ) clearTimeout( idTimer );
+                        return;
+                    }
+                });
+                dev[name]['motion'] = move;
             }
         });
 
