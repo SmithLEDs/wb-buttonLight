@@ -32,8 +32,8 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
     }
 
     // Создаем объекты для хранения устройств реле и кнопок
-    var button = Object.create( baseTargetObject );
-    var light = Object.create( baseTargetObject );
+    var button = new Object(baseTargetObject); 
+    var light = new Object(baseTargetObject); 
 
     createVirtualDevice( title , name );
 
@@ -47,7 +47,7 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
 
     if ( targetMotion ) {
         // Объект для хранения устройств движения
-        var motion = Object.create( baseTargetObject );
+        var motion = new Object(baseTargetObject); 
 
         reloadDeviceArray( targetMotion , motion , name + '/motion_' );
         createErrorRule( motion , name + '(motionDevices)' ); // Отслеживаем изменение meta #error устройств движения
@@ -431,6 +431,10 @@ function reloadDeviceArray( source , target , name ) {
         }     
     }
 
+    log(target.target.length);
+    target.target.forEach( function (item, index, arr) {
+        log(index + ': ' + item);
+    });
 
 }
 
