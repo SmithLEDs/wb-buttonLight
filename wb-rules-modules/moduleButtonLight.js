@@ -2,7 +2,7 @@
 /**
  * @brief   Данная функция создает виртуальное устройство для управления группой света.
  * @authors SmithLEDs (https://github.com/SmithLEDs/wb-buttonLight)
- * @version v.1.4
+ * @version v.1.5
  * 
  * @param {String}  title           Описание виртуального устройства (Можно на русском)
  * @param {String}  name            Имя виртуального устройства (Будет отображаться в новом виртуальном кстройстве как name/... )
@@ -16,6 +16,7 @@
  *                                  и не создадутся контролы для управления по движению).
  */
 
+// Объект для хранения устройств кнопок или выключателей
 var button = {
     target: [],  
     error: [],
@@ -24,6 +25,7 @@ var button = {
     name: "",
     exist: false
 };
+// Объект для хранения устройств реле
 var light = {
     target: [],  
     error: [],
@@ -46,44 +48,28 @@ var motion = {
 
 function createLightingGroup ( title , name , master ) {
 
+    if ( !light.exist ) {
+        log.error("Нет ни одного устройства для управления светом! Выходим");
+    }
+
     var firstStartRule = true;      // Флаг первого запуска модуля или перезагрузки правил
 
     if ( master ) {
         var ps = new PersistentStorage( name + "_storage", { global: true }); // Постоянное хранилище для запоминания состояний реле
     }
 
-
-
     createVirtualDevice( title , name );
-
-    // Первым делом перебираем массивы всех физических устройств
-    //reloadDeviceArray( targetButton , button , name + '/button_' );
-    //reloadDeviceArray( targetLight , light , name + '/light_' );
-    
-    // Отслеживаем изменение meta #error устройств кнопок и света
-    //createErrorRule( button );
-    //createErrorRule( light );
-
-    //if ( targetMotion ) {
-        //reloadDeviceArray( targetMotion , motion , name + '/motion_' );
-        //createErrorRule( motion ); // Отслеживаем изменение meta #error устройств движения
-    //}
-
 
     // Создаем новое правило для отслеживания переключений виртуальных кнопок,
     // что бы управлять физическими реле прямо из виртуального устройства
-    if (light.exist) {
-        defineRule(name + ' ruleLight', {
-            whenChanged: light.virt,
-            then: function (newValue, devName, cellName) {
-                var i = light.virt.indexOf( devName + '/' + cellName );
-                if ( i != -1 ) dev[light.target[i]] = newValue;
-            }
-        });
-    }
-
-
-
+    defineRule(name + ' ruleLight', {
+        whenChanged: light.virt,
+        then: function (newValue, devName, cellName) {
+            var i = light.virt.indexOf( devName + '/' + cellName );
+            if ( i != -1 ) dev[light.target[i]] = newValue;
+        }
+    });
+    
     /**
      * @brief   Правило обработки перезагрузки правил - по идее должно выполниться всего один раз в самом начале.
      *          Тут перебираем массив источников света "targetLight" и добавляем новые контролы этих источников в виртуальное устройство.
@@ -471,7 +457,7 @@ function reloadDeviceArray( source , target , name ) {
 
 
 /**
- * @brief   Функция проверяет на существование устройства и его контрола.
+ * @brief   Функция проверяет на существование одного устройства и его контрола.
  * 
  * @param {String} topic Топик для проверки типа "device/control"
  */
@@ -490,6 +476,28 @@ function deviceExists( topic ) {
     return exists;
 }
 
+
+/**
+ * @brief   Функция проверяет на существование устройств.
+ * 
+ * @param {String} topic Топик или массив топиков для проверки типа "device/control"
+ * @return Если хоть одно устройство не доступно, то сразу же возвращаем false
+ */
+function devicesExists( topic ) {
+    if (topic == undefined) return false;
+    if ( topic.constructor === Array ) {
+        topic.forEach( function (item, index, arr) {
+            if ( !deviceExists(item) ) return false;
+        });
+    } else {
+        if ( !deviceExists(topic) ) return false;
+    }
+
+    return true;
+}
+
+
+
 exports.createLightingGroup  = function( title , name , targetButton , targetLight , master , targetMotion ) {
     
     var test_interval = null;
@@ -500,45 +508,23 @@ exports.createLightingGroup  = function( title , name , targetButton , targetLig
         var loadDivicesOK = true;
         ++i;
         
-        if ( targetButton && (i <= qty) ) {
-            if ( targetButton.constructor === Array ) {
-                targetButton.forEach( function (item, index, arr) {
-                    if ( !deviceExists(item) ) loadDivicesOK = false;
-                });  
-            } else {
-                if ( !deviceExists(targetButton) ) loadDivicesOK = false;
-            }
-        }
+        if ( !devicesExists(targetButton) ) loadDivicesOK = false;
+        if ( !devicesExists(targetLight) )  loadDivicesOK = false;
+        if ( !devicesExists(targetMotion) ) loadDivicesOK = false;
+        
 
-        if ( targetLight && (i <= qty) ) {
-            if ( targetLight.constructor === Array ) {
-                targetLight.forEach( function (item, index, arr) {
-                    if ( !deviceExists(item) ) loadDivicesOK = false;
-                });  
-            } else {
-                if ( !deviceExists(targetLight) ) loadDivicesOK = false;
-            }
-        }
-
-        if ( targetMotion && (i <= qty) ) {
-            if ( targetMotion.constructor === Array ) {
-                targetMotion.forEach( function (item, index, arr) {
-                    if ( !deviceExists(item) ) loadDivicesOK = false;
-                });  
-            } else {
-                if ( !deviceExists(targetMotion) ) loadDivicesOK = false;
-            }
-        }
-
-        if ( loadDivicesOK ) {
+        // Если все устройства существуют или закончилось кол-во попыток проверок
+        if ( loadDivicesOK || (i > qty) ) {
             clearInterval(test_interval);
 
             reloadDeviceArray( targetButton , button , name + '/button_' );
             button.name = name + ' (buttonDevices)';
             createErrorRule( button );
+
             reloadDeviceArray( targetLight , light , name + '/light_' );
             light.name = name + ' (lightDevices)';
             createErrorRule( light );
+
             reloadDeviceArray( targetMotion , motion , name + '/motion_' );
             motion.name = name + ' (motionDevices)';
             createErrorRule( motion );
@@ -546,5 +532,5 @@ exports.createLightingGroup  = function( title , name , targetButton , targetLig
             createLightingGroup ( title , name , master );
         }
 
-      }, 1000);  
+      }, 5000);  
 } 
