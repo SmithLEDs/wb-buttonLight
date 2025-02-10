@@ -256,14 +256,18 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
                 if ( item ) flagON = true;
                 return;
             });
-            dev[name]['stateGroup'] = flagON;
+            
 
             if ( motion.target ) {
-                if (idTimer) clearTimeout(idTimer);
-                if ( dev[name]['stateGroup'] ) {
+                // Если предедущее значение было отключено и включилась группа
+                // и нет движения
+                if ( flagON && !dev[name]['stateGroup'] && !dev[name]['motion']) {
+                    if (idTimer) clearTimeout(idTimer);
                     idTimer = startTimer();
                 }
             }
+
+            dev[name]['stateGroup'] = flagON;
         }
     });
 
@@ -274,7 +278,7 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
     // Отслеживаем изменение датчиков движения, если они есть
     if ( motion.target ) {
 
-        var idTimer = null;            // Таймер для отключения света
+        var idTimer = null;            // Индификатор таймера для отключения света
 
         // Создаем функцию, которая создает таймер для отключения света по таймауту "timeout"
         function startTimer() {
@@ -326,7 +330,10 @@ function createLightingGroup ( title , name , targetButton , targetLight , maste
                     if ( item > motion.sens ) {
                         move = true;
                         // Если таймер на отключение света взведен, то отключаем 
-                        if ( idTimer ) clearTimeout( idTimer );
+                        if ( idTimer ) {
+                            clearTimeout( idTimer );
+                            idTimer = null;
+                        }
                         return;
                     }
                 });
@@ -481,5 +488,5 @@ function deviceExists( topic ) {
 exports.createLightingGroup  = function( title , name , targetButton , targetLight , master , targetMotion ) {
     setTimeout( function() {
         createLightingGroup ( title , name , targetButton , targetLight , master , targetMotion );
-    }, 5000 );
+    }, 10000 );
 } 
