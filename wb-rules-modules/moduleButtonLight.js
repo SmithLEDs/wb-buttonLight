@@ -2,7 +2,7 @@
 /**
  * @brief   Данная функция создает виртуальное устройство для управления группой света.
  * @authors SmithLEDs (https://github.com/SmithLEDs/wb-buttonLight)
- * @version v.1.2
+ * @version v.1.4
  * 
  * @param {String}  title           Описание виртуального устройства (Можно на русском)
  * @param {String}  name            Имя виртуального устройства (Будет отображаться в новом виртуальном кстройстве как name/... )
