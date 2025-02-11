@@ -48,10 +48,6 @@ var motion = {
 
 function createLightingGroup ( title , name , master ) {
 
-    if ( !light.exist ) {
-        log.error("Нет ни одного устройства для управления светом! Выходим");
-    }
-
     var firstStartRule = true;      // Флаг первого запуска модуля или перезагрузки правил
 
     if ( master ) {
@@ -81,7 +77,6 @@ function createLightingGroup ( title , name , master ) {
             return firstStartRule;
         },
         then: function () {
-            log.warning('[' + title + ']: Перезагрузка модуля'); 
 
             if ( button.exist ) {
                 button.target.forEach( function (item, index, arr) {
@@ -244,12 +239,12 @@ function createLightingGroup ( title , name , master ) {
             }
 
             // Тут проверяем состояние всех реле
-            light.value.forEach( function (item) {
-                // Если хоть одна группа включена, то взводим флаг
-                if ( item ) flagON = true;
-                return;
-            });
-            
+            for (var k = 0, l = light.value.length; k<l; ++k) {
+                if ( light.value[k] ) {
+                    flagON = true;
+                    break;
+                }
+            }
 
             if ( motion.exist ) {
                 // Если предедущее значение было отключено и включилась группа
@@ -316,17 +311,13 @@ function createLightingGroup ( title , name , master ) {
 
                 var move = false;
                 // Перебираем массив значений, и если хоть одно значение больше чувствительности взводим флаг
-                motion.value.forEach( function (item) {
-                    if ( item > motion.sens ) {
+                for (var i = 0, l = motion.value.length; i < l; ++i) {
+                    if (motion.value[i] > motion.sens) {
                         move = true;
-                        // Если таймер на отключение света взведен, то отключаем 
-                        if ( idTimer ) {
-                            clearTimeout( idTimer );
-                            idTimer = null;
-                        }
-                        return;
+                        break;
                     }
-                });
+                }
+
                 dev[name]['motion'] = move;
             }
         });
@@ -337,6 +328,11 @@ function createLightingGroup ( title , name , master ) {
                 return dev[name]['motion'];
             },
             then: function () {
+                // Очищаем таймер при появлении движения
+                if ( idTimer ) {
+                    clearTimeout( idTimer );
+                    idTimer = null;
+                }
                 // Если активно включение света при начале движения
                 if ( dev[name]['motionLightON'] ) {
                     if ( !dev[name]['stateGroup'] ) {
@@ -423,10 +419,10 @@ function createErrorRule( target ) {
 
 /**
  * @brief   Функция перебирает массив устройств и добавляет существующие
- *          устройства в структуру с массивами, с которым в дальнейшем работает главная 
+ *          устройства к объекту с массивами, с которым в дальнейшем работает главная 
  *          функция
  * @param {*} source        Массив или переменная - источник физических устройств
- * @param {*} target        Структура, в которую добавятся только существующие устройства
+ * @param {*} target        Объект, в которую добавятся только существующие устройства
  * @param {*} name          Имя для добавления нового виртуального устройства
  */
 function reloadDeviceArray( source , target , name ) {
@@ -447,8 +443,6 @@ function reloadDeviceArray( source , target , name ) {
             target.error.push( source + "#error" );
             target.virt.push( name + 0 );
             target.exist = true;
-        } else {
-            
         }
     }
 
@@ -468,7 +462,6 @@ function deviceExists( topic ) {
 
     if ( getDevice(device) !== undefined ) {
         if ( getDevice(device).isControlExists(control) ) {
-            // Устройство и контрол существуют, можно работать с данным топиком
             exists = true;
         }
     }
@@ -484,22 +477,23 @@ function deviceExists( topic ) {
  * @return Если хоть одно устройство не доступно, то сразу же возвращаем false
  */
 function devicesExists( topic ) {
+    var exists = true;
     if (topic == undefined) return false;
     if ( topic.constructor === Array ) {
         topic.forEach( function (item, index, arr) {
-            if ( !deviceExists(item) ) return false;
+            if ( !deviceExists(item) ) exists = false;
         });
     } else {
-        if ( !deviceExists(topic) ) return false;
+        if ( !deviceExists(topic) ) exists = false;
     }
-
-    return true;
+    
+    return exists;
 }
 
 
 
 exports.createLightingGroup  = function( title , name , targetButton , targetLight , master , targetMotion ) {
-    
+    log.warning('[' + title + ']: Перезагрузка модуля, ожидание устройств...');
     var test_interval = null;
     var i = 0;
     var qty = 60;
@@ -507,29 +501,33 @@ exports.createLightingGroup  = function( title , name , targetButton , targetLig
     test_interval = setInterval(function () {
         var loadDivicesOK = true;
         ++i;
-        
         if ( !devicesExists(targetButton) ) loadDivicesOK = false;
         if ( !devicesExists(targetLight) )  loadDivicesOK = false;
         if ( !devicesExists(targetMotion) ) loadDivicesOK = false;
         
-
         // Если все устройства существуют или закончилось кол-во попыток проверок
         if ( loadDivicesOK || (i > qty) ) {
             clearInterval(test_interval);
 
             reloadDeviceArray( targetButton , button , name + '/button_' );
             button.name = name + ' (buttonDevices)';
-            createErrorRule( button );
-
-            reloadDeviceArray( targetLight , light , name + '/light_' );
-            light.name = name + ' (lightDevices)';
-            createErrorRule( light );
 
             reloadDeviceArray( targetMotion , motion , name + '/motion_' );
             motion.name = name + ' (motionDevices)';
+            
+            reloadDeviceArray( targetLight , light , name + '/light_' );
+            light.name = name + ' (lightDevices)';
+            
             createErrorRule( motion );
+            createErrorRule( button );
+            createErrorRule( light );
 
-            createLightingGroup ( title , name , master );
+            if ( !light.exist ) {
+                log.error("Нет ни одного устройства для управления светом! Выходим");
+            } else { 
+                createLightingGroup ( title , name , master );
+            }
+
         }
 
       }, 5000);  
