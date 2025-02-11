@@ -348,6 +348,7 @@ function createLightingGroup ( title , name , master ) {
                 return !dev[name]['motion'];
             },
             then: function () {
+                if (!dev[name]["stateGroup"]) return;
                 if (idTimer) clearTimeout(idTimer);
                 idTimer = startTimer();
             }
