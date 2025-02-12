@@ -133,3 +133,4 @@ button.createLightingGroup('Свет в коридоре' , 'Light_hallway' , bu
 
 - `v2.21.1-2-g9c86d73`
 - `v2.23.1-1-ge77bad7`
+- `v2.25.0-2-g105d68c`
