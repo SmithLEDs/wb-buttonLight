@@ -23,7 +23,8 @@ var button = {
     virt: [],
     value: [],
     name: "",
-    exist: false
+    exist: false,
+    valid: []
 };
 // Объект для хранения устройств реле
 var light = {
@@ -32,7 +33,8 @@ var light = {
     virt: [],
     value: [],
     name: "",
-    exist: false
+    exist: false,
+    valid: []
 };
 // Объект для хранения устройств движения
 var motion = {
@@ -43,7 +45,8 @@ var motion = {
     timeout: 10,
     sens: 35,
     name: "",
-    exist: false
+    exist: false,
+    valid: []
 };
 
 function createLightingGroup ( title , name , master ) {
@@ -100,7 +103,8 @@ function createLightingGroup ( title , name , master ) {
                     });   
                     if ( dev[button.error[index]] !== undefined ) {
                         dev[button.virt[index] + '#error'] = dev[button.error[index]];
-                    }             
+                        button.valid[index] = false;
+                    }              
                 });
             } else {
                 getDevice(name).addControl( "ButtonAlarm", { 
@@ -124,6 +128,7 @@ function createLightingGroup ( title , name , master ) {
                 
                 if ( dev[light.error[index]] !== undefined ) {
                     dev[light.virt[index] + '#error'] = dev[light.error[index]];
+                    light.valid[index] = false;
                 }
             });
             dev[name]['qtyLight'] = light.target.length;
@@ -174,6 +179,7 @@ function createLightingGroup ( title , name , master ) {
                     });
                     if ( dev[motion.error[index]] !== undefined ) {
                         dev[motion.virt[index] + '#error'] = dev[motion.error[index]];
+                        motion.valid[index] = false;
                     }
                 });
             }
@@ -213,13 +219,13 @@ function createLightingGroup ( title , name , master ) {
     defineRule(name + '_clickButtonPhysical', {
         whenChanged: button.target,
         then: function (newValue, devName, cellName) {
-            dev[name]['button'] = true;
-
             // Изменяем наш виртуальный контрол для наглядности
             var i = button.target.indexOf( devName + '/' + cellName );
             if ( i != -1 ) {
                 button.value[i] = newValue;
                 dev[button.virt[i]] = newValue;
+                // Если кнопка валидна, то переключаем реле
+                if ( button.valid[i] ) dev[name]['button'] = true;
             }
         }
     });
@@ -413,6 +419,14 @@ function createErrorRule( target ) {
         then: function (newValue, devName, cellName) {
             var i = target.error.indexOf( devName + '/' + cellName );
             if ( i != -1 ) dev[target.virt[i] + '#error'] = newValue;
+            if ( newValue ) {
+                target.valid[i] = false;
+            } else {
+                // Создаем таймер на задержку после потери связи
+                setTimeout(function () {
+                    target.valid[i] = true;
+                }, 2000);
+            }
         }
     });
 }
@@ -434,6 +448,7 @@ function reloadDeviceArray( source , target , name ) {
                 target.target.push( item );
                 target.error.push( item + "#error" );
                 target.virt.push( name + i );
+                target.valid.push(true);
                 i++;
                 target.exist = true;
             }
@@ -443,6 +458,7 @@ function reloadDeviceArray( source , target , name ) {
             target.target.push( source );
             target.error.push( source + "#error" );
             target.virt.push( name + 0 );
+            target.valid.push(true);
             target.exist = true;
         }
     }
@@ -465,6 +481,8 @@ function deviceExists( topic ) {
         if ( getDevice(device).isControlExists(control) ) {
             exists = true;
         }
+    } else {
+        log.error("{} - не существует", topic);
     }
 
     return exists;
@@ -475,7 +493,7 @@ function deviceExists( topic ) {
  * @brief   Функция проверяет на существование устройств.
  * 
  * @param {String} topic Топик или массив топиков для проверки типа "device/control"
- * @return Если хоть одно устройство не доступно, то сразу же возвращаем false
+ * @return Если хоть одно устройство не доступно, то возвращаем false
  */
 function devicesExists( topic ) {
     var exists = true;
