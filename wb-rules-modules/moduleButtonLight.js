@@ -1,8 +1,8 @@
 
 /**
- * @brief   Данная функция создает виртуальное устройство для управления группой света.
+ * @brief   Данный модуль создает виртуальное устройство для управления группой света.
  * @authors SmithLEDs (https://github.com/SmithLEDs/wb-buttonLight)
- * @version v.1.5
+ * @version v.1.6
  * 
  * @param {String}  title           Описание виртуального устройства (Можно на русском)
  * @param {String}  name            Имя виртуального устройства (Будет отображаться в новом виртуальном кстройстве как name/... )
@@ -410,7 +410,7 @@ function createVirtualDevice( title , name ) {
 /**
  * @brief   Функция создает правило для слежения за meta #error
  * 
- * @param {*} target Структура на список устройств
+ * @param {*} target Объект с массивами устройств
  */
 function createErrorRule( target ) {
     if ( !target.exist ) return;
@@ -422,7 +422,7 @@ function createErrorRule( target ) {
             if ( newValue ) {
                 target.valid[i] = false;
             } else {
-                // Создаем таймер на задержку после потери связи
+                // Создаем таймер на задержку после восстановления связи
                 setTimeout(function () {
                     target.valid[i] = true;
                 }, 2000);
