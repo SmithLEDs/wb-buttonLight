@@ -2,7 +2,7 @@
 /**
  * @brief   Данный модуль создает виртуальное устройство для управления группой света.
  * @authors SmithLEDs (https://github.com/SmithLEDs/wb-buttonLight)
- * @version v.1.6
+ * @version v.1.7
  * 
  * @param {String}  title           Описание виртуального устройства (Можно на русском)
  * @param {String}  name            Имя виртуального устройства (Будет отображаться в новом виртуальном кстройстве как name/... )
@@ -16,48 +16,13 @@
  *                                  и не создадутся контролы для управления по движению).
  */
 
-// Объект для хранения устройств кнопок или выключателей
-var button = {
-    target: [],  
-    error: [],
-    virt: [],
-    value: [],
-    name: "",
-    exist: false,
-    valid: []
-};
-// Объект для хранения устройств реле
-var light = {
-    target: [],  
-    error: [],
-    virt: [],
-    value: [],
-    name: "",
-    exist: false,
-    valid: []
-};
-// Объект для хранения устройств движения
-var motion = {
-    target: [],  
-    error: [],
-    virt: [],
-    value: [],
-    timeout: 10,
-    sens: 35,
-    name: "",
-    exist: false,
-    valid: []
-};
 
-function createLightingGroup ( title , name , master ) {
 
-    var firstStartRule = true;      // Флаг первого запуска модуля или перезагрузки правил
+function createLightingGroup ( title , name , master , button, light, motion) {
 
     if ( master ) {
         var ps = new PersistentStorage( name + "_storage", { global: true }); // Постоянное хранилище для запоминания состояний реле
     }
-
-    createVirtualDevice( title , name );
 
     // Создаем новое правило для отслеживания переключений виртуальных кнопок,
     // что бы управлять физическими реле прямо из виртуального устройства
@@ -69,123 +34,6 @@ function createLightingGroup ( title , name , master ) {
         }
     });
     
-    /**
-     * @brief   Правило обработки перезагрузки правил - по идее должно выполниться всего один раз в самом начале.
-     *          Тут перебираем массив источников света "targetLight" и добавляем новые контролы этих источников в виртуальное устройство.
-     *          Сразу при добавлении считываем текущее состояние реле. forceDefault обязателен.
-     *          Так при обновлении правил новые виртуальные контролы перезагружаются с правильными состояния физических реле.
-     */
-    defineRule(name + '_rebootRule', {
-        asSoonAs: function() {
-            return firstStartRule;
-        },
-        then: function () {
-
-            if ( button.exist ) {
-                button.target.forEach( function (item, index, arr) {
-                    var itemType = "";
-                    switch( typeof dev[item] ) {
-                        case 'boolean':
-                            itemType = "switch";
-                        break;
-                        case 'number':
-                            itemType = "value";
-                        break;
-                    }
-
-                    button.value[index] = dev[item];
-                    getDevice(name).addControl( "button_" + index , { 
-                        title: item, 
-                        type: itemType, 
-                        value: button.value[index], 
-                        readonly: true,
-                        forceDefault: true
-                    });   
-                    if ( dev[button.error[index]] !== undefined ) {
-                        dev[button.virt[index] + '#error'] = dev[button.error[index]];
-                        button.valid[index] = false;
-                    }              
-                });
-            } else {
-                getDevice(name).addControl( "ButtonAlarm", { 
-                    title: "Отсутствует физическое управление", 
-                    type: "alarm", 
-                    value: true
-                });   
-            }
-
-            var flagON = false;
-            light.target.forEach( function (item, index, arr) {
-                light.value[index] = dev[item];
-                getDevice(name).addControl( "light_" + index , { 
-                    title: item, 
-                    type: "switch", 
-                    value: light.value[index], 
-                    readonly: false,
-                    forceDefault: true
-                });
-                if ( light.value[index] ) flagON = true;
-                
-                if ( dev[light.error[index]] !== undefined ) {
-                    dev[light.virt[index] + '#error'] = dev[light.error[index]];
-                    light.valid[index] = false;
-                }
-            });
-            dev[name]['qtyLight'] = light.target.length;
-            dev[name]['qtyButton'] = button.target.length;
-            dev[name]['stateGroup'] = flagON;
-
-
-
-            // Если указали датчики движения, то создаем нужные контролы
-            if ( motion.exist ) {
-                getDevice(name).addControl( "motion" , { 
-                    title: "Присутствие в зоне", 
-                    type: "switch", 
-                    value: false, 
-                    readonly: true
-                });
-                getDevice(name).addControl( "motionLightON" , { 
-                    title: "Включать свет при начале движения", 
-                    type: "switch", 
-                    value: false, 
-                    readonly: false
-                });
-                getDevice(name).addControl( "timeout" , { 
-                    title: "Таймаут отключения света, мин.", 
-                    type: "range", 
-                    value: motion.timeout, 
-                    readonly: false,
-                    min: 1,
-                    max: 30
-                });
-                getDevice(name).addControl( "sensitivity" , { 
-                    title: "Чувствительность датчика", 
-                    type: "range",
-                    value: motion.sens,
-                    readonly: false,
-                    min: 1,
-                    max: 500
-                });
-
-                motion.target.forEach( function(item, index, arr) {
-                    motion.value[index] = dev[item];
-                    getDevice(name).addControl( "motion_" + index , { 
-                        title: item, 
-                        type: "value", 
-                        value: motion.value[index], 
-                        readonly: true,
-                        forceDefault: true
-                    });
-                    if ( dev[motion.error[index]] !== undefined ) {
-                        dev[motion.virt[index] + '#error'] = dev[motion.error[index]];
-                        motion.valid[index] = false;
-                    }
-                });
-            }
-        }
-    });
-
 
     /**
      * @brief   Правило отслеживает нажатие виртуальной кнопки "button".
@@ -407,6 +255,119 @@ function createVirtualDevice( title , name ) {
         }
     });
 }
+
+
+/**
+ * @brief   Функция добавляет к виртуальному устройству новые контролы, если они существуют
+ * @param {string} name     Имя виртуального устройства, к которому добавлять новые контролы
+ * @param {object} button   Объект кнопок и выключателей
+ * @param {object} light    Объект реле
+ * @param {object} motion   Объект датчиков движения
+ */
+function addControlDevice( name , button , light , motion ) {
+
+    // Если есть устройства для управления светом
+    if ( button.exist ) {
+        dev[name]['qtyButton'] = button.target.length;
+        button.target.forEach( function (item, index, arr) {
+            var itemType = "";
+            switch( typeof dev[item] ) {
+                case 'boolean':
+                    itemType = "switch";
+                break;
+                case 'number':
+                    itemType = "value";
+                break;
+            }
+
+            button.value[index] = dev[item];
+            getDevice(name).addControl( "button_" + index , { 
+                title: item, 
+                type: itemType, 
+                value: button.value[index], 
+                readonly: true,
+                forceDefault: true
+            });   
+            if ( dev[button.error[index]] !== undefined ) {
+                dev[button.virt[index] + '#error'] = dev[button.error[index]];
+                button.valid[index] = false;
+            }              
+        });
+    }
+
+    // Если есть устройства реле
+    if ( light.exist ) {
+        var flagON = false;
+        dev[name]['qtyLight'] = light.target.length;
+        light.target.forEach( function (item, index, arr) {
+            light.value[index] = dev[item];
+            getDevice(name).addControl( "light_" + index , { 
+                title: item, 
+                type: "switch", 
+                value: light.value[index], 
+                readonly: false,
+                forceDefault: true
+            });
+            if ( light.value[index] ) flagON = true;
+            
+            if ( dev[light.error[index]] !== undefined ) {
+                dev[light.virt[index] + '#error'] = dev[light.error[index]];
+                light.valid[index] = false;
+            }
+        });
+        dev[name]['stateGroup'] = flagON;
+    }
+    
+    
+    // Если указали датчики движения, то создаем нужные контролы
+    if ( motion.exist ) {
+        getDevice(name).addControl( "motion" , { 
+            title: "Присутствие в зоне", 
+            type: "switch", 
+            value: false, 
+            readonly: true
+        });
+        getDevice(name).addControl( "motionLightON" , { 
+            title: "Включать свет при начале движения", 
+            type: "switch", 
+            value: false, 
+            readonly: false
+        });
+        getDevice(name).addControl( "timeout" , { 
+            title: "Таймаут отключения света, мин.", 
+            type: "range", 
+            value: motion.timeout, 
+            readonly: false,
+            min: 1,
+            max: 30
+        });
+        getDevice(name).addControl( "sensitivity" , { 
+            title: "Чувствительность датчика", 
+            type: "range",
+            value: motion.sens,
+            readonly: false,
+            min: 1,
+            max: 500
+        });
+
+        motion.target.forEach( function(item, index, arr) {
+            motion.value[index] = dev[item];
+            getDevice(name).addControl( "motion_" + index , { 
+                title: item, 
+                type: "value", 
+                value: motion.value[index], 
+                readonly: true,
+                forceDefault: true
+            });
+            if ( dev[motion.error[index]] !== undefined ) {
+                dev[motion.virt[index] + '#error'] = dev[motion.error[index]];
+                motion.valid[index] = false;
+            }
+        });
+    }
+}
+
+
 /**
  * @brief   Функция создает правило для слежения за meta #error
  * 
@@ -436,11 +397,12 @@ function createErrorRule( target ) {
  * @brief   Функция перебирает массив устройств и добавляет существующие
  *          устройства к объекту с массивами, с которым в дальнейшем работает главная 
  *          функция
- * @param {*} source        Массив или переменная - источник физических устройств
- * @param {*} target        Объект, в которую добавятся только существующие устройства
- * @param {*} name          Имя для добавления нового виртуального устройства
+ * @param {*} source    Массив или переменная - источник физических устройств
+ * @param {*} target    Объект, в который добавятся только существующие устройства
+ * @param {*} name      Имя для добавления нового виртуального устройства
  */
 function reloadDeviceArray( source , target , name ) {
+    if (source == undefined) return;
     if ( source.constructor === Array ) {
         var i = 0;
         source.forEach( function (item, index, arr) {
@@ -449,8 +411,8 @@ function reloadDeviceArray( source , target , name ) {
                 target.error.push( item + "#error" );
                 target.virt.push( name + i );
                 target.valid.push(true);
-                i++;
                 target.exist = true;
+                i++;
             }
         });
     } else {
@@ -498,10 +460,13 @@ function deviceExists( topic ) {
 function devicesExists( topic ) {
     var exists = true;
     if (topic == undefined) return false;
-    if ( topic.constructor === Array ) {
-        topic.forEach( function (item, index, arr) {
-            if ( !deviceExists(item) ) exists = false;
-        });
+    if (topic.constructor === Array) {
+        for (var i = 0, l = topic.length; i < l; ++i) {
+            if (!deviceExists(topic[i])) {
+                exists = false;
+                break;
+            }
+        }
     } else {
         if ( !deviceExists(topic) ) exists = false;
     }
@@ -513,6 +478,41 @@ function devicesExists( topic ) {
 
 exports.createLightingGroup  = function( title , name , targetButton , targetLight , master , targetMotion ) {
     log.warning('[' + title + ']: Перезагрузка модуля, ожидание устройств...');
+
+    // Объект для хранения устройств кнопок или выключателей
+    var oButton = {
+        target: [],  
+        error:  [],
+        virt:   [],
+        value:  [],
+        valid:  [],
+        name:   name + ' (buttonDevices)',
+        exist:  false
+
+    };
+    // Объект для хранения устройств реле
+    var oLight = {
+        target: [],  
+        error:  [],
+        virt:   [],
+        value:  [],
+        valid:  [],
+        name:   name + ' (lightDevices)',
+        exist:  false
+    };
+    // Объект для хранения устройств движения
+    var oMotion = {
+        target:  [],  
+        error:   [],
+        virt:    [],
+        value:   [],
+        valid:   [],
+        timeout: 10,
+        sens:    35,
+        name:    name + ' (motionDevices)',
+        exist:   false
+    };
+
     var test_interval = null;
     var i = 0;
     var qty = 60;
@@ -520,34 +520,31 @@ exports.createLightingGroup  = function( title , name , targetButton , targetLig
     test_interval = setInterval(function () {
         var loadDivicesOK = true;
         ++i;
-        if ( !devicesExists(targetButton) ) loadDivicesOK = false;
-        if ( !devicesExists(targetLight) )  loadDivicesOK = false;
-        if ( !devicesExists(targetMotion) ) loadDivicesOK = false;
+
+        if ( targetButton && !devicesExists(targetButton) ) loadDivicesOK = false;
+        if ( targetLight && !devicesExists(targetLight) )  loadDivicesOK = false;
+        if ( targetMotion && !devicesExists(targetMotion) ) loadDivicesOK = false;
         
         // Если все устройства существуют или закончилось кол-во попыток проверок
         if ( loadDivicesOK || (i > qty) ) {
             clearInterval(test_interval);
 
-            reloadDeviceArray( targetButton , button , name + '/button_' );
-            button.name = name + ' (buttonDevices)';
+            reloadDeviceArray( targetButton , oButton , name + '/button_' );
+            reloadDeviceArray( targetMotion , oMotion , name + '/motion_' );
+            reloadDeviceArray( targetLight  , oLight  , name + '/light_'  );
 
-            reloadDeviceArray( targetMotion , motion , name + '/motion_' );
-            motion.name = name + ' (motionDevices)';
-            
-            reloadDeviceArray( targetLight , light , name + '/light_' );
-            light.name = name + ' (lightDevices)';
-            
-            createErrorRule( motion );
-            createErrorRule( button );
-            createErrorRule( light );
-
-            if ( !light.exist ) {
-                log.error("Нет ни одного устройства для управления светом! Выходим");
+            if ( !oLight.exist ) {
+                log.error(name + " - Нет ни одного устройства для управления светом! Расходимся...");
             } else { 
-                createLightingGroup ( title , name , master );
+                createVirtualDevice(title, name);
+                addControlDevice( name , oButton , oLight , oMotion);
+    
+                createErrorRule( oMotion );
+                createErrorRule( oButton );
+                createErrorRule( oLight );
+
+                createLightingGroup ( title , name , master, oButton , oLight , oMotion );
             }
-
         }
-
-      }, 5000);  
-} 
+    }, 5000);  
+}
