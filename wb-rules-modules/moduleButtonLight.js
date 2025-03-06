@@ -132,14 +132,6 @@ function createLightingGroup ( title , name , master , button, light, motion) {
             }, motion.timeout * 1000 * 60 ); //
         }
 
-        // Создаем функцию, которая создает таймер для отключения статуса движения
-        function startTimerTimeout() {
-            return setTimeout(function () {
-                dev[name]['motion'] = false;
-                log.debug('[' + title + ']: Удалён таймер на таймаут: ' + idTimerTimeout);
-                idTimerTimeout = null;
-            }, 12000 ); //
-        }
 
         // Правило отслеживает изменение чувствительности датчиков
         defineRule(name + '_sensitivityChange', {
@@ -176,15 +168,15 @@ function createLightingGroup ( title , name , master , button, light, motion) {
                 var move = false;
                 // Перебираем массив значений, и если хоть одно значение больше чувствительности взводим флаг
                 for (var i = 0, l = motion.value.length; i < l; ++i) {
-                    if (motion.value[i] > motion.sens) {
-                        move = true;
-                        break;
+                    if (motion.valid[i]) {
+                        if (motion.value[i] > motion.sens) {
+                            move = true;
+                            break;
+                        }
                     }
                 }
 
-                if (move) {
-                    dev[name]['motion'] = true;
-                }
+                dev[name]['motion'] = move;
             }
         });
 
@@ -200,11 +192,6 @@ function createLightingGroup ( title , name , master , button, light, motion) {
                     idTimer = null;
                 }
 
-                // Взводим таймер на таймаут отключения статуса движения
-                if (idTimerTimeout) clearTimeout(idTimerTimeout);
-                idTimerTimeout = startTimerTimeout();
-                log.debug('[' + title + ']: Взведён таймер на таймаут: ' + idTimerTimeout);
-                
                 // Если активно включение света при начале движения
                 if ( dev[name]['motionLightON'] ) {
                     if ( !dev[name]['stateGroup'] ) {
@@ -225,6 +212,20 @@ function createLightingGroup ( title , name , master , button, light, motion) {
                 idTimer = startTimer();
             }
         });
+
+        // Правило отслеживает валидность группы датчиков движения
+        // Если нет ни одного датчика, которому можно верить, то 
+        // переводим motion в false и подсветим для наглядности
+        defineRule(name + '_motionValidGroup', {
+            asSoonAs: function () {
+                return !motion.validGroup;
+            },
+            then: function () {
+                dev[name]['motion'] = false;
+                dev[name]['motion#error'] = "r";
+            }
+        });
+
     }
 
 
@@ -400,10 +401,18 @@ function createErrorRule( target ) {
             if ( i != -1 ) dev[target.virt[i] + '#error'] = newValue;
             if ( newValue ) {
                 target.valid[i] = false;
+                var v = false;
+                // Проверяем все остальные устройства на валидность.
+                // Если ВСЕ устройства не валидны, значит вся группа не валидна
+                target.valid.forEach( function(item) {
+                    if (item) v = true;
+                });
+                target.validGroup = v;
             } else {
                 // Создаем таймер на задержку после восстановления связи
                 setTimeout(function () {
                     target.valid[i] = true;
+                    target.validGroup = true;
                 }, 2000);
             }
         }
@@ -505,8 +514,8 @@ exports.createLightingGroup  = function( title , name , targetButton , targetLig
         value:  [],
         valid:  [],
         name:   name + ' (buttonDevices)',
-        exist:  false
-
+        exist:  false,
+        validGroup: true
     };
     // Объект для хранения устройств реле
     var oLight = {
@@ -516,7 +525,8 @@ exports.createLightingGroup  = function( title , name , targetButton , targetLig
         value:  [],
         valid:  [],
         name:   name + ' (lightDevices)',
-        exist:  false
+        exist:  false,
+        validGroup: true
     };
     // Объект для хранения устройств движения
     var oMotion = {
@@ -529,7 +539,7 @@ exports.createLightingGroup  = function( title , name , targetButton , targetLig
         sens:    35,
         name:    name + ' (motionDevices)',
         exist:   false,
-        lastMove: false
+        validGroup: true
     };
 
     var test_interval = null;
