@@ -2,7 +2,7 @@
 /**
  * @brief   Данный модуль создает виртуальное устройство для управления группой света.
  * @authors SmithLEDs (https://github.com/SmithLEDs/wb-buttonLight)
- * @version v.1.7
+ * @version v.1.8
  * 
  * @param {String}  title           Описание виртуального устройства (Можно на русском)
  * @param {String}  name            Имя виртуального устройства (Будет отображаться в новом виртуальном кстройстве как name/... )
@@ -117,7 +117,8 @@ function createLightingGroup ( title , name , master , button, light, motion) {
     // Отслеживаем изменение датчиков движения, если они есть
     if ( motion.exist ) {
 
-        var idTimer = null;            // Индификатор таймера для отключения света
+        var idTimer = null;           // Индификатор таймера для отключения света
+        var idTimerTimeout = null;    // Индификатор таймера для таймаута отключения статуса движения
 
         // Создаем функцию, которая создает таймер для отключения света по таймауту "timeout"
         function startTimer() {
@@ -129,6 +130,15 @@ function createLightingGroup ( title , name , master , button, light, motion) {
                 idTimer = null;
                 
             }, motion.timeout * 1000 * 60 ); //
+        }
+
+        // Создаем функцию, которая создает таймер для отключения статуса движения
+        function startTimerTimeout() {
+            return setTimeout(function () {
+                dev[name]['motion'] = false;
+                log.debug('[' + title + ']: Удалён таймер на таймаут: ' + idTimerTimeout);
+                idTimerTimeout = null;
+            }, 12000 ); //
         }
 
         // Правило отслеживает изменение чувствительности датчиков
@@ -172,7 +182,9 @@ function createLightingGroup ( title , name , master , button, light, motion) {
                     }
                 }
 
-                dev[name]['motion'] = move;
+                if (move) {
+                    dev[name]['motion'] = true;
+                }
             }
         });
 
@@ -182,11 +194,17 @@ function createLightingGroup ( title , name , master , button, light, motion) {
                 return dev[name]['motion'];
             },
             then: function () {
-                // Очищаем таймер при появлении движения
+                // Очищаем таймер отключения света при появлении движения
                 if ( idTimer ) {
                     clearTimeout( idTimer );
                     idTimer = null;
                 }
+
+                // Взводим таймер на таймаут отключения статуса движения
+                if (idTimerTimeout) clearTimeout(idTimerTimeout);
+                idTimerTimeout = startTimerTimeout();
+                log.debug('[' + title + ']: Взведён таймер на таймаут: ' + idTimerTimeout);
+                
                 // Если активно включение света при начале движения
                 if ( dev[name]['motionLightON'] ) {
                     if ( !dev[name]['stateGroup'] ) {
@@ -510,7 +528,8 @@ exports.createLightingGroup  = function( title , name , targetButton , targetLig
         timeout: 10,
         sens:    35,
         name:    name + ' (motionDevices)',
-        exist:   false
+        exist:   false,
+        lastMove: false
     };
 
     var test_interval = null;
